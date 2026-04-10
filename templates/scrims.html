@@ -35,7 +35,54 @@
             border-bottom: 1px solid #444; /* Темный разделитель */
             color: #eee; /* Светлый текст заголовка */
         }
-        
+        /* Общий контейнер для полосок игрока */
+        .player-stats-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 120px; /* Ширина блока с полосками */
+            justify-content: center;
+        }
+
+        /* Контейнер одной полоски */
+        .stat-bar-wrapper {
+            height: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Сама заливка */
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .bar-fill.dmg {
+            background: linear-gradient(90deg, #8e2de2, #ff0080); /* Градиент урона */
+            box-shadow: 0 0 5px rgba(255, 0, 128, 0.5);
+        }
+
+        .bar-fill.gold {
+            background: linear-gradient(90deg, #f2994a, #f2c94c); /* Градиент золота */
+            box-shadow: 0 0 5px rgba(242, 201, 76, 0.5);
+        }
+
+        /* Текст поверх полоски */
+        .bar-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 9px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+            pointer-events: none;
+            z-index: 1;
+        }
         /* Строка игрока */
         .player-detail-row {
             display: flex;
@@ -283,11 +330,13 @@
                                                     {% endif %}
                                                 </div>
                                                 <div class="runes-container asset-box" style="display: none;">{{ p.rune_html | safe }}</div>
-                                                <div class="stats-container asset-box" style="display: none; width: 100%; max-width: 100px;">
-                                                    <div style="height: 4px; background: #111; border-radius: 2px; overflow: hidden;">
-                                                        <div style="width: {{ (p.dmg / (p.max_dmg if p.max_dmg > 0 else 1) * 100)|round }}%; height: 100%; background: #4a90e2;"></div>
+                                                <div class="stats-container asset-box" style="display: none; flex-direction: column; gap: 3px; width: 100px; justify-content: center;">
+                                                    <div style="height: 6px; background: rgba(0,0,0,0.5); border-radius: 1px; overflow: hidden; position: relative;" title="Damage: {{ p.dmg }}">
+                                                        <div style="width: {{ (p.dmg / (p.max_dmg if p.max_dmg > 0 else 1) * 100)|int }}%; height: 100%; background: linear-gradient(90deg, #8e2de2, #ff0080);"></div>
                                                     </div>
-                                                    <div style="font-size: 0.7em; color: #888; text-align: center;">{{ p.dmg }} dmg</div>
+                                                    <div style="height: 6px; background: rgba(0,0,0,0.5); border-radius: 1px; overflow: hidden; position: relative;" title="Gold: {{ p.gold }}">
+                                                        <div style="width: {{ (p.gold / (p.max_gold if p.max_gold > 0 else 1) * 100)|int }}%; height: 100%; background: linear-gradient(90deg, #f2994a, #f2c94c);"></div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div style="width: 70px; text-align: right; font-family: monospace; font-size: 0.85em;">{{ p.k }}/{{ p.d }}/{{ p.a }}</div>
@@ -359,11 +408,13 @@
                                                     {% endif %}
                                                 </div>
                                                 <div class="runes-container asset-box" style="display: none;">{{ p.rune_html | safe }}</div>
-                                                <div class="stats-container asset-box" style="display: none; width: 100%; max-width: 100px;">
-                                                    <div style="height: 4px; background: #111; border-radius: 2px; overflow: hidden;">
-                                                        <div style="width: {{ (p.dmg / (p.max_dmg if p.max_dmg > 0 else 1) * 100)|round }}%; height: 100%; background: #e24a4a;"></div>
+                                                <div class="stats-container asset-box" style="display: none; flex-direction: column; gap: 3px; width: 100px; justify-content: center;">
+                                                    <div style="height: 6px; background: rgba(0,0,0,0.5); border-radius: 1px; overflow: hidden; position: relative;" title="Damage: {{ p.dmg }}">
+                                                        <div style="width: {{ (p.dmg / (p.max_dmg if p.max_dmg > 0 else 1) * 100)|int }}%; height: 100%; background: linear-gradient(90deg, #8e2de2, #ff0080);"></div>
                                                     </div>
-                                                    <div style="font-size: 0.7em; color: #888; text-align: center;">{{ p.dmg }} dmg</div>
+                                                    <div style="height: 6px; background: rgba(0,0,0,0.5); border-radius: 1px; overflow: hidden; position: relative;" title="Gold: {{ p.gold }}">
+                                                        <div style="width: {{ (p.gold / (p.max_gold if p.max_gold > 0 else 1) * 100)|int }}%; height: 100%; background: linear-gradient(90deg, #f2994a, #f2c94c);"></div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div style="width: 70px; text-align: right; font-family: monospace; font-size: 0.85em;">{{ p.k }}/{{ p.d }}/{{ p.a }}</div>

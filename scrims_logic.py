@@ -16,23 +16,24 @@ import math # Для округления
 GRID_API_KEY = os.getenv("GRID_API_KEY")
 GRID_BASE_URL = "https://api.grid.gg/"
 TEAM_NAME = "paiN Gaming" # HLL Team Name
-PLAYER_IDS = {"24422": "Robo", "23038": "PAIN CarioK", "23755": "PAIN tinowns", "25075": "PAIN TitaN", "23553": "PAIN Kuri"} # HLL Roster
-ROSTER_RIOT_NAME_TO_GRID_ID = {"Robo": "24422", "PAIN CarioK": "23038", "PAIN tinowns": "23755", "PAIN TitaN": "25075", "PAIN Kuri": "23553"} # HLL Roster
-PLAYER_ROLES_BY_ID = {"24422": "TOP", "23038": "JUNGLE", "23755": "MIDDLE", "25075": "BOTTOM", "23553": "UTILITY"} # HLL Roles
+PLAYER_IDS = {"24422": "Robo", "23038": "PAIN CarioK", "24481": "PAIN Keine", "25075": "PAIN Trigger", "23553": "PAIN Kuri"} # HLL Roster
+ROSTER_RIOT_NAME_TO_GRID_ID = {"Robo": "24422", "PAIN CarioK": "23038", "PAIN Keine": "24481", "PAIN Trigger": "25075", "PAIN Kuri": "23553"} # HLL Roster
+PLAYER_ROLES_BY_ID = {"24422": "TOP", "23038": "JUNGLE", "24481": "MIDDLE", "25075": "BOTTOM", "23553": "UTILITY"} # HLL Roles
 API_REQUEST_DELAY = 0.5 # HLL Delay
 ROLE_ORDER_FOR_SHEET = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
 PLAYER_NAME_MAP = {
-    "PAIN Extra 01": "PAIN tinowns",
-    "PAIN tinowns": "PAIN tinowns",
-    "PAIN Robo": "Robo", 
     "PAIN Robo": "PAIN Robo",
+    "Robo": "PAIN Robo",
     "PAIN CarioK": "PAIN CarioK",
-    "PAIN TitaN": "PAIN TitaN",
-    "PAIN Extra 09": "PAIN Marvin",
-    "PAIN Marvin":"PAIN Marvin",
-    "PAIN Kuri": "PAIN Kuri"
+    "CarioK": "PAIN CarioK",
+    "PAIN Keine": "PAIN Keine",
+    "Keine": "PAIN Keine",
+    "PAIN Trigger": "PAIN Trigger",
+    "Trigger": "PAIN Trigger",
+    "PAIN Kuri": "PAIN Kuri",
+    "Kuri": "PAIN Kuri"
 }
-PLAYER_DISPLAY_ORDER = ["PAIN Robo", "PAIN CarioK", "PAIN tinowns", "PAIN Marvin", "PAIN Kuri"]
+PLAYER_DISPLAY_ORDER = ["PAIN Robo", "PAIN CarioK", "PAIN Keine", "PAIN Trigger", "PAIN Kuri"]
 
 # --- Логирование ---
 def log_message(message):
@@ -124,7 +125,7 @@ def get_rest_request(endpoint, retries=5, initial_delay=2, expected_type='json')
     log_message(f"REST GET failed after {retries} attempts for {endpoint}. Last error: {last_exception}")
     return None
 
-def get_all_series(days_ago=40):
+def get_all_series(days_ago=19):
     """ Получает список ID и дат начала LoL скримов за последние N дней """
     query_string = """
         query ($filter: SeriesFilter, $first: Int, $after: Cursor, $orderBy: SeriesOrderBy, $orderDirection: OrderDirection) {
@@ -223,7 +224,7 @@ def extract_team_tag(riot_id_game_name):
 # --- Функция обновления и сохранения данных скримов в SQLite (Без изменений от HLL) ---
 def fetch_and_store_scrims():
     log_message("Starting scrims update process...")
-    series_list = get_all_series(days_ago=40)
+    series_list = get_all_series(days_ago=19)
     if not series_list: 
         log_message("No recent series found.")
         return 0
@@ -658,11 +659,28 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
 
         for row in all_scrim_data:
             game = dict(row)
+            # --- ФИЛЬТР ПО ДЛИТЕЛЬНОСТИ (БОЛЬШЕ 20 МИНУТ) ---
+            duration_str = game.get("Duration", "00:00")
+            try:
+                # Превращаем "MM:SS" в общее количество секунд
+                parts = duration_str.split(':')
+                if len(parts) == 2:
+                    minutes, seconds = map(int, parts)
+                    total_seconds = minutes * 60 + seconds
+                else:
+                    total_seconds = int(parts[0]) # Если там вдруг просто число секунд
+                
+                # Если игра длилась меньше 1200 секунд (20 минут), пропускаем её
+                if total_seconds < 1200:
+                    continue
+            except (ValueError, TypeError):
+                # Если формат времени битый, лучше пропустить игру от греха подальше
+                continue
             game_id = str(game.get("Game_ID") or game.get("Game ID") or "N/A")
             result = game.get("Result", "Unknown")
             
-            is_our_blue = game.get("Blue_Team_Name") == "Bushido Wildcats"
-            is_our_red = game.get("Red_Team_Name") == "Bushido Wildcats"
+            is_our_blue = game.get("Blue_Team_Name") == "paiN Gaming"
+            is_our_red = game.get("Red_Team_Name") == "paiN Gaming"
             
             if is_our_blue:
                 if result == "Win": overall_stats["blue_wins"] += 1
@@ -712,10 +730,15 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                 rp.append(get_champion_icon_html(game.get(f"Red_{r_a}_Champ"), champion_data))
 
             match_max_dmg = 1
+            match_max_gold = 1
             for role in roles_ordered:
                 r_a = role_to_abbr[role]
+                # Урон
                 match_max_dmg = max(match_max_dmg, int(game.get(f"Blue_{r_a}_Dmg", 0) or 0), int(game.get(f"Red_{r_a}_Dmg", 0) or 0))
+                # Золото
+                match_max_gold = max(match_max_gold, int(game.get(f"Blue_{r_a}_Gold", 0) or 0), int(game.get(f"Red_{r_a}_Gold", 0) or 0))
 
+            # 2. Сбор данных игроков
             for role in roles_ordered:
                 r_a = role_to_abbr[role]
                 for side in ['Blue', 'Red']:
@@ -723,17 +746,24 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                     champ = game.get(f"{p_f}_Champ", "N/A")
                     k, d, a = int(game.get(f"{p_f}_K", 0) or 0), int(game.get(f"{p_f}_D", 0) or 0), int(game.get(f"{p_f}_A", 0) or 0)
                     dmg, cs = int(game.get(f"{p_f}_Dmg", 0) or 0), int(game.get(f"{p_f}_CS", 0) or 0)
+                    gold = int(game.get(f"{p_f}_Gold", 0) or 0) # Достаем золото
                     
-                    # Пытаемся получить иконку руны без импорта функции, если она не найдена
                     rune_id = game.get(f"{p_f}_Runes", "0")
-                    rune_html = f'<img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/7200_Domination.png" width="24" height="24">' # Заглушка, если функции нет
+                    rune_html = get_rune_icon_html(rune_id)
                     
                     p_entry = {
-                        'role': role, 'name': game.get(f"{p_f}_Player", "Unknown"),
-                        'champion': champ, 'icon_html': get_champion_icon_html(champ, champion_data, 32, 32),
-                        'k': k, 'd': d, 'a': a, 'dmg': dmg, 'cs': cs,
-                        'max_dmg': match_max_dmg, 'items_list': game.get(f"{p_f}_Items", ""),
-                        'rune_html': rune_html # Здесь стоит использовать твою рабочую логику из app.py если она там есть
+                        'role': role, 
+                        'name': game.get(f"{p_f}_Player", "Unknown"),
+                        'champion': champ, 
+                        'icon_html': get_champion_icon_html(champ, champion_data, 32, 32),
+                        'k': k, 'd': d, 'a': a, 
+                        'dmg': dmg, 
+                        'gold': gold,            # Добавлено
+                        'cs': cs,
+                        'max_dmg': match_max_dmg, 
+                        'max_gold': match_max_gold, # Добавлено (решает ошибку Jinja2)
+                        'items_list': game.get(f"{p_f}_Items", ""),
+                        'rune_html': rune_html
                     }
                     
                     details[side.lower() + '_players'].append(p_entry)
@@ -752,20 +782,38 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                 "B_Picks_HTML": " ".join(filter(None, bp)), "R_Picks_HTML": " ".join(filter(None, rp))
             })
 
-        final_player_stats = defaultdict(dict)
-        for player, champs in player_stats_agg.items():
-            for champ, s in champs.items():
-                g = s['games']
-                if g > 0:
-                    s.update({
-                        'win_rate': round((s['wins']/g)*100, 1),
-                        'kda': round((s['k']+s['a'])/max(1, s['d']), 1),
-                        'avg_dmg': s['dmg'] // g, 'avg_cs': round(s['cs']/g, 1),
-                        'icon_html': get_champion_icon_html(champ, champion_data, 30, 30)
-                    })
-                    final_player_stats[player][champ] = s
+        final_player_stats = {} # Используем обычный словарь, чтобы сохранить порядок
+        
+        # Проходим строго по списку PLAYER_DISPLAY_ORDER
+        for display_name in PLAYER_DISPLAY_ORDER:
+            # Проверяем, есть ли статистика для этого игрока в собранных данных
+            if display_name in player_stats_agg:
+                champs_stats = player_stats_agg[display_name]
+                formatted_champs = {}
+                
+                for champ, s in champs_stats.items():
+                    g = s['games']
+                    if g > 0:
+                        formatted_champs[champ] = {
+                            'games': g,
+                            'wins': s['wins'],
+                            'k': s['k'],
+                            'd': s['d'],
+                            'a': s['a'],
+                            'dmg': s['dmg'],
+                            'cs': s['cs'],
+                            'win_rate': round((s['wins'] / g) * 100, 1),
+                            'kda': round((s['k'] + s['a']) / max(1, s['d']), 1),
+                            'avg_dmg': s['dmg'] // g,
+                            'avg_cs': round(s['cs'] / g, 1),
+                            'icon_html': get_champion_icon_html(champ, champion_data, 30, 30)
+                        }
+                
+                # Если у игрока есть хотя бы одна игра, добавляем его в финальный отчет
+                if formatted_champs:
+                    final_player_stats[display_name] = formatted_champs
 
-        return overall_stats, history_list, dict(final_player_stats), champion_data
+        return overall_stats, history_list, final_player_stats, champion_data
 
     except Exception as e:
         log_message(f"Aggregation Error: {e}")
