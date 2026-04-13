@@ -16,9 +16,42 @@ import math # Для округления
 GRID_API_KEY = os.getenv("GRID_API_KEY")
 GRID_BASE_URL = "https://api.grid.gg/"
 TEAM_NAME = "paiN Gaming" # HLL Team Name
-PLAYER_IDS = {"24422": "Robo", "23038": "PAIN CarioK", "24481": "PAIN Keine", "25075": "PAIN Trigger", "23553": "PAIN Kuri"} # HLL Roster
-ROSTER_RIOT_NAME_TO_GRID_ID = {"Robo": "24422", "PAIN CarioK": "23038", "PAIN Keine": "24481", "PAIN Trigger": "25075", "PAIN Kuri": "23553"} # HLL Roster
-PLAYER_ROLES_BY_ID = {"24422": "TOP", "23038": "JUNGLE", "24481": "MIDDLE", "25075": "BOTTOM", "23553": "UTILITY"} # HLL Roles
+PLAYER_IDS = {
+    "24422": "Robo", 
+    "23038": "PAIN CarioK", 
+    "24481": "PAIN Keine", 
+    "25075": "PAIN Trigger", 
+    "23553": "PAIN Kuri",
+    "20749": "PAIN Zoen",
+    "29529": "PAIN Levizin",
+    "29528": "PAIN Namiru",
+    "29543": "PAIN Marvin",
+    "25848": "PAIN Pipo"
+}
+ROSTER_RIOT_NAME_TO_GRID_ID = {
+    "Robo": "24422", 
+    "PAIN CarioK": "23038", 
+    "PAIN Keine": "24481", 
+    "PAIN Trigger": "25075", 
+    "PAIN Kuri": "23553",
+    "PAIN Zoen": "20749",
+    "PAIN Levizin": "29529",
+    "PAIN Namiru": "29528",
+    "PAIN Marvin": "29543",
+    "PAIN Pipo": "25848"
+}
+PLAYER_ROLES_BY_ID = {
+    "24422": "TOP", 
+    "23038": "JUNGLE", 
+    "24481": "MIDDLE", 
+    "25075": "BOTTOM", 
+    "23553": "UTILITY",
+    "20749": "TOP",
+    "20749": "JUNGLE",
+    "29528": "MIDDLE",
+    "29543": "BOTTOM",
+    "25848": "UTILITY"
+}
 API_REQUEST_DELAY = 0.5 # HLL Delay
 ROLE_ORDER_FOR_SHEET = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
 PLAYER_NAME_MAP = {
@@ -125,7 +158,7 @@ def get_rest_request(endpoint, retries=5, initial_delay=2, expected_type='json')
     log_message(f"REST GET failed after {retries} attempts for {endpoint}. Last error: {last_exception}")
     return None
 
-def get_all_series(days_ago=19):
+def get_all_series(days_ago=15):
     """ Получает список ID и дат начала LoL скримов за последние N дней """
     query_string = """
         query ($filter: SeriesFilter, $first: Int, $after: Cursor, $orderBy: SeriesOrderBy, $orderDirection: OrderDirection) {
@@ -206,7 +239,7 @@ def download_riot_livestats_data(series_id, sequence_number):
 def normalize_player_name(riot_id_game_name):
     """ Удаляет известные командные префиксы из игрового имени Riot ID """
     if isinstance(riot_id_game_name, str):
-        known_prefixes = ["GSMC "] # Используем префикс HLL
+        known_prefixes = ["GSMC ","PAIN ", "PAIN ","PNGA"] # Используем префикс HLL
         for prefix in known_prefixes:
             if riot_id_game_name.startswith(prefix):
                 return riot_id_game_name[len(prefix):].strip()
@@ -224,7 +257,7 @@ def extract_team_tag(riot_id_game_name):
 # --- Функция обновления и сохранения данных скримов в SQLite (Без изменений от HLL) ---
 def fetch_and_store_scrims():
     log_message("Starting scrims update process...")
-    series_list = get_all_series(days_ago=19)
+    series_list = get_all_series(days_ago=15)
     if not series_list: 
         log_message("No recent series found.")
         return 0
@@ -624,12 +657,13 @@ def get_rune_icon_html(rune_id_input, width=22, height=22):
 def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
     """
     Исправленная версия: удален конфликтующий импорт get_rune_icon_html.
+    Добавлен сбор статистики оппонентов.
     """
     from database import get_db_connection # Убедись, что это импортируется корректно
     
     log_message(f"Aggregating scrim data. Time: {time_filter}, Side: {side_filter}")
     conn = get_db_connection()
-    if not conn: return {}, [], {}, {}
+    if not conn: return {}, [], {}, {}, {}, {} # Теперь возвращаем 6 элементов
 
     where_clause = ""
     params = []
@@ -653,6 +687,9 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
         overall_stats = { "total_games": 0, "blue_wins": 0, "blue_losses": 0, "red_wins": 0, "red_losses": 0 }
         history_list = []
         player_stats_agg = defaultdict(lambda: defaultdict(lambda: {'games': 0, 'wins': 0, 'k': 0, 'd': 0, 'a': 0, 'dmg': 0, 'cs': 0}))
+        
+        # НОВОЕ: Словарь для сбора статистики оппонентов {TeamName: {PlayerName: {Champ: stats}}}
+        opponent_stats_agg = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {'games': 0, 'wins': 0, 'k': 0, 'd': 0, 'a': 0, 'dmg': 0, 'cs': 0})))
         
         role_to_abbr = {"TOP": "TOP", "JUNGLE": "JGL", "MIDDLE": "MID", "BOTTOM": "BOT", "UTILITY": "SUP"}
         roles_ordered = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
@@ -773,6 +810,16 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                         st = player_stats_agg[p_entry['name']][champ]
                         st['games'] += 1; st['wins'] += (result == "Win")
                         st['k'] += k; st['d'] += d; st['a'] += a; st['dmg'] += dmg; st['cs'] += cs
+                    else:
+                        # НОВОЕ: Заполняем стату вражеских игроков
+                        opponent_team_name = game.get("Blue_Team_Name") if side == 'Blue' else game.get("Red_Team_Name")
+                        if opponent_team_name != "Unknown" and opponent_team_name != "Opponent":
+                            opp_st = opponent_stats_agg[opponent_team_name][p_entry['name']][champ]
+                            opp_st['games'] += 1
+                            # Если наша команда проиграла, значит оппонент выиграл
+                            opp_win = 1 if result == "Loss" else 0
+                            opp_st['wins'] += opp_win
+                            opp_st['k'] += k; opp_st['d'] += d; opp_st['a'] += a; opp_st['dmg'] += dmg; opp_st['cs'] += cs
 
             history_list.append({
                 "Date": game.get("Date", "N/A"), "Patch": game.get("Patch", "N/A"),
@@ -782,11 +829,10 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                 "B_Picks_HTML": " ".join(filter(None, bp)), "R_Picks_HTML": " ".join(filter(None, rp))
             })
 
-        final_player_stats = {} # Используем обычный словарь, чтобы сохранить порядок
+        final_player_stats = {} 
         
         # Проходим строго по списку PLAYER_DISPLAY_ORDER
         for display_name in PLAYER_DISPLAY_ORDER:
-            # Проверяем, есть ли статистика для этого игрока в собранных данных
             if display_name in player_stats_agg:
                 champs_stats = player_stats_agg[display_name]
                 formatted_champs = {}
@@ -809,17 +855,44 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                             'icon_html': get_champion_icon_html(champ, champion_data, 30, 30)
                         }
                 
-                # Если у игрока есть хотя бы одна игра, добавляем его в финальный отчет
                 if formatted_champs:
                     final_player_stats[display_name] = formatted_champs
 
-        return overall_stats, history_list, final_player_stats, champion_data
+        # НОВОЕ: Форматируем стату оппонентов
+        final_opponent_stats = {}
+        opponent_teams_list = []
+        
+        for opp_team, players in opponent_stats_agg.items():
+            opponent_teams_list.append(opp_team)
+            final_opponent_stats[opp_team] = {}
+            for player_name, champs_stats in players.items():
+                formatted_champs = {}
+                for champ, s in champs_stats.items():
+                    g = s['games']
+                    if g > 0:
+                        formatted_champs[champ] = {
+                            'games': g,
+                            'wins': s['wins'],
+                            'k': s['k'], 'd': s['d'], 'a': s['a'], 'dmg': s['dmg'], 'cs': s['cs'],
+                            'win_rate': round((s['wins'] / g) * 100, 1),
+                            'kda': round((s['k'] + s['a']) / max(1, s['d']), 1),
+                            'avg_dmg': s['dmg'] // g,
+                            'avg_cs': round(s['cs'] / g, 1),
+                            'icon_html': get_champion_icon_html(champ, champion_data, 30, 30)
+                        }
+                if formatted_champs:
+                    final_opponent_stats[opp_team][player_name] = formatted_champs
+                    
+        opponent_teams_list.sort() # Сортируем названия команд по алфавиту для удобства в селекторе
+
+        # Возвращаем 6 элементов, чтобы передать их дальше в app.py
+        return overall_stats, history_list, final_player_stats, final_opponent_stats, opponent_teams_list, champion_data
 
     except Exception as e:
         log_message(f"Aggregation Error: {e}")
         import traceback
-        log_message(traceback.format_exc()) # Поможет увидеть где именно ошибка
-        return {}, [], {}, {}
+        log_message(traceback.format_exc()) 
+        return {}, [], {}, {}, [], {}
     finally:
         if conn: conn.close()
 # --- Блок для тестирования ---

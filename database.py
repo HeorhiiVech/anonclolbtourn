@@ -277,7 +277,6 @@ def init_db():
         except sqlite3.Error as e:
             print(f"Ошибка при создании таблицы/индексов 'player_positions_timeline': {e}")
             
-# <<< ОБНОВЛЕННАЯ ТАБЛИЦА ДЛЯ МИНИ-ПЛЕЕРА (СОБЫТИЯ И ОБЪЕКТЫ) >>>
         print("Проверка/создание таблицы objective_events...")
         create_objectives_sql = """
         CREATE TABLE IF NOT EXISTS objective_events (
@@ -295,7 +294,6 @@ def init_db():
             lane TEXT                         -- 'TOP_LANE' и т.д.
         );
         """
-        # Индексы для моментальной загрузки таймлайна в Scrims
         create_objectives_game_id_index = "CREATE INDEX IF NOT EXISTS idx_objectives_game_id ON objective_events (game_id);"
         create_objectives_type_index = "CREATE INDEX IF NOT EXISTS idx_objectives_event_type ON objective_events (event_type);"
         
@@ -306,6 +304,23 @@ def init_db():
             print("Таблица 'objective_events' обновлена для поддержки мини-плеера.")
         except sqlite3.Error as e:
             print(f"Ошибка при создании objective_events: {e}")
+
+        # <<< НОВАЯ ТАБЛИЦА ДЛЯ FEARLESS DRAFTING >>>
+        print("Проверка/создание таблицы fearless_drafts...")
+        create_fearless_sql = """
+        CREATE TABLE IF NOT EXISTS fearless_drafts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            series_name TEXT NOT NULL,
+            roster TEXT NOT NULL,
+            draft_data TEXT NOT NULL,
+            last_updated TEXT NOT NULL
+        );
+        """
+        try:
+            cursor.execute(create_fearless_sql)
+            print("Таблица 'fearless_drafts' успешно проверена/создана.")
+        except sqlite3.Error as e:
+            print(f"Ошибка при создании таблицы 'fearless_drafts': {e}")
 
         conn.commit()
     except sqlite3.Error as e:
