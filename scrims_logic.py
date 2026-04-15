@@ -66,7 +66,7 @@ PLAYER_NAME_MAP = {
     "PAIN Kuri": "PAIN Kuri",
     "Kuri": "PAIN Kuri"
 }
-PLAYER_DISPLAY_ORDER = ["PAIN Robo", "PAIN CarioK", "PAIN Keine", "PAIN Trigger", "PAIN Kuri"]
+PLAYER_DISPLAY_ORDER = ["Robo", "CarioK", "Keine", "Trigger", "Kuri"]
 
 # --- Логирование ---
 def log_message(message):
