@@ -10,7 +10,7 @@ _basedir = os.path.abspath(os.path.dirname(__file__))
 DATABASE_PATH = os.path.join(_basedir, 'scrims_data.db')
 
 # --- Заголовки таблиц ---
-SCRIMS_HEADER = [
+SCRIMS_HEADER_BASE = [
     "Date", "Patch", "Blue Team Name", "Red Team Name", "Duration", "Result",
     "Blue Ban 1 ID", "Blue Ban 2 ID", "Blue Ban 3 ID", "Blue Ban 4 ID", "Blue Ban 5 ID",
     "Red Ban 1 ID", "Red Ban 2 ID", "Red Ban 3 ID", "Red Ban 4 ID", "Red Ban 5 ID",
@@ -49,15 +49,25 @@ TOURNAMENT_GAMES_HEADER_BASE = [
     "Red_TOP_PartID", "Red_JGL_PartID", "Red_MID_PartID", "Red_BOT_PartID", "Red_SUP_PartID",
     "Game ID", "Series ID", "Sequence Number"
 ]
+
 draft_action_columns = []
 for i in range(1, 21):
-    draft_action_columns.extend([ f"Draft_Action_{i}_Type", f"Draft_Action_{i}_TeamID", f"Draft_Action_{i}_ChampName", f"Draft_Action_{i}_ChampID", f"Draft_Action_{i}_ActionID" ])
+    draft_action_columns.extend([ 
+        f"Draft_Action_{i}_Type", 
+        f"Draft_Action_{i}_TeamID", 
+        f"Draft_Action_{i}_ChampName", 
+        f"Draft_Action_{i}_ChampID", 
+        f"Draft_Action_{i}_ActionID" 
+    ])
+
+SCRIMS_HEADER = SCRIMS_HEADER_BASE + draft_action_columns
 TOURNAMENT_GAMES_HEADER = TOURNAMENT_GAMES_HEADER_BASE + draft_action_columns
 
 SOLOQ_GAMES_HEADER = [
     "Match_ID", "Player_Name", "Riot_Name", "Riot_Tag", "Timestamp", "Date_Readable",
     "Win", "Champion", "Role", "Kills", "Deaths", "Assists"
 ]
+
 
 manual_draft_action_headers = [f"action_{i}_champion" for i in range(1, 21)]
 MANUAL_DRAFTS_HEADER = [

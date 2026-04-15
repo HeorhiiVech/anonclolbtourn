@@ -151,7 +151,7 @@
     <h2>Overall Statistics ({{ selected_time_filter }})</h2>
     {% if overall_stats and overall_stats.total_games > 0 %}
         <div class="overall-stats-container">
-            <div class="stat-card"> {# Total card без доп. класса #}
+            <div class="stat-card">
                 <h3>Total</h3>
                 <p class="stat-value">{{ overall_stats.total_games }}</p>
                 <p class="stat-label">Games</p>
@@ -161,7 +161,6 @@
                 </p>
                  <small>({{ overall_stats.blue_wins + overall_stats.red_wins }}W - {{ overall_stats.blue_losses + overall_stats.red_losses }}L)</small>
             </div>
-             {# Добавляем классы stat-card-blue и stat-card-red #}
             <div class="stat-card stat-card-blue">
                 <h3>Blue Side</h3>
                  {% set blue_games = overall_stats.blue_wins + overall_stats.blue_losses %}
@@ -196,7 +195,7 @@
 
     <div id="opponent-stats-section" style="display: none; background-color: #1e1e1e; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
-            <h2 style="margin: 0; color: #e74c3c;">Opponent Champion Stats</h2>
+            <h2 style="margin: 0; color: #e74c3c;">Opponent Stats & Priority Picks</h2>
             <div class="side-filter-controls">
                 <label for="opponent-select" style="color: #ccc; margin-right: 10px;">Select Team:</label>
                 <select id="opponent-select" onchange="showOpponentTeam(this.value)" style="padding: 6px; background-color: #333; color: white; border: 1px solid #555; border-radius: 4px;">
@@ -210,45 +209,148 @@
 
         {% if opponent_stats %}
             <div id="opponent-grids-container">
-                {% for team_name, players in opponent_stats.items() %}
-                    <div class="opponent-team-grid player-stats-grid" id="opp-grid-{{ team_name | replace(' ', '-') }}" style="display: none;">
-                        {% for player_name, champs in players.items() %}
-                            <div class="player-column" style="background: #2a2a2a; border: 1px solid #444; padding: 10px; border-radius: 6px;">
-                                <h3 style="color: #e74c3c; text-align: center; border-bottom: 1px solid #444; padding-bottom: 5px;">{{ player_name }}</h3>
+                {% for team_name, team_data in opponent_stats.items() %}
+                    <div class="opponent-team-grid" id="opp-grid-{{ team_name | replace(' ', '-') }}" style="display: none; flex-direction: column;">
+                        
+                        <div class="player-stats-grid" style="display: flex; flex-wrap: wrap; gap: 15px;">
+                            {% for player_name, champs in team_data.players.items() %}
+                                <div class="player-column" style="background: #2a2a2a; border: 1px solid #444; padding: 10px; border-radius: 6px; flex: 1; min-width: 300px;">
+                                    <h3 style="color: #e74c3c; text-align: center; border-bottom: 1px solid #444; padding-bottom: 5px;">{{ player_name }}</h3>
+                                    <div class="table-responsive">
+                                        <table class="player-champ-table sortable-table" id="table-opp-{{ team_name | replace(' ', '-') }}-{{ player_name | replace(' ', '-') }}">
+                                            <thead>
+                                                <tr>
+                                                    <th>Icon</th>
+                                                    <th class="sortable-header" data-sort-col="1" data-sort-type="number">G</th>
+                                                    <th class="sortable-header" data-sort-col="2" data-sort-type="number">WR%</th>
+                                                    <th class="sortable-header" data-sort-col="3" data-sort-type="number">KDA</th>
+                                                    <th class="sortable-header" data-sort-col="4" data-sort-type="number">Dmg</th>
+                                                    <th class="sortable-header" data-sort-col="5" data-sort-type="number">CS</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for champ_name, stats in champs.items() %}
+                                                <tr>
+                                                    <td>{{ stats.icon_html | safe }}</td>
+                                                    <td>{{ stats.games }}</td>
+                                                    <td data-sort-value="{{ stats.win_rate }}" class="{% if stats.win_rate >= 60 %}wr-high{% elif stats.win_rate <= 45 %}wr-low{% else %}wr-mid{% endif %}">
+                                                        {{ "%.1f"|format(stats.win_rate) }}
+                                                    </td>
+                                                    <td data-sort-value="{{ stats.kda }}">{{ "%.1f"|format(stats.kda) }}</td>
+                                                    <td data-sort-value="{{ stats.avg_dmg }}">{{ stats.avg_dmg }}</td>
+                                                    <td data-sort-value="{{ stats.avg_cs }}">{{ "%.1f"|format(stats.avg_cs) }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <hr style="border-color: #444; margin: 25px 0;">
+
+                        <h3 style="color: #e74c3c; margin-bottom: 15px; text-align: center;">Team Priority Picks</h3>
+                        <div class="priority-picks-container" style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+                            {% set priority_data = team_data.priority %}
+                            
+                            <div class="priority-picks-block" style="flex: 1; min-width: 400px; max-width: 600px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 15px;">
+                                <h5 style="color: #4a90e2; text-align: center; margin-top: 0;">Blue Side Priority</h5>
+                                {% if priority_data.blue %}
+                                <div class="priority-filters" style="margin-bottom: 10px; text-align: center;">
+                                    <span style="color: #ccc; font-size: 0.9em;">Filter by Pick:</span>
+                                    <button class="button priority-filter-btn active" data-target-table="blue-priority-table-{{ team_name | replace(' ', '-') }}" data-phase="all" style="padding: 4px 8px; font-size: 0.8em; margin: 2px;">All</button>
+                                    {% for phase in priority_data.blue_phases %}
+                                        <button class="button priority-filter-btn" data-target-table="blue-priority-table-{{ team_name | replace(' ', '-') }}" data-phase="{{ phase }}" style="padding: 4px 8px; font-size: 0.8em; margin: 2px;">{{ phase }}</button>
+                                    {% endfor %}
+                                </div>
                                 <div class="table-responsive">
-                                    <table class="player-champ-table sortable-table" id="table-opp-{{ player_name | replace(' ', '-') }}">
+                                    <table class="player-champ-table priority-picks-table" id="blue-priority-table-{{ team_name | replace(' ', '-') }}" style="width: 100%;">
                                         <thead>
                                             <tr>
                                                 <th>Icon</th>
-                                                <th class="sortable-header" data-sort-col="1" data-sort-type="number">G</th>
-                                                <th class="sortable-header" data-sort-col="2" data-sort-type="number">WR%</th>
-                                                <th class="sortable-header" data-sort-col="3" data-sort-type="number">KDA</th>
-                                                <th class="sortable-header" data-sort-col="4" data-sort-type="number">Dmg</th>
-                                                <th class="sortable-header" data-sort-col="5" data-sort-type="number">CS</th>
+                                                <th>Champion</th>
+                                                <th>Total</th>
+                                                {% for phase in priority_data.blue_phases %}
+                                                <th class="phase-col {{ phase }}">{{ phase }}</th>
+                                                {% endfor %}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                        {% for champ_name, stats in champs.items() %}
-                                            <tr>
-                                                <td>{{ stats.icon_html | safe }}</td>
-                                                <td>{{ stats.games }}</td>
-                                                <td data-sort-value="{{ stats.win_rate }}" class="{% if stats.win_rate >= 60 %}wr-high{% elif stats.win_rate <= 45 %}wr-low{% else %}wr-mid{% endif %}">
-                                                    {{ "%.1f"|format(stats.win_rate) }}
-                                                </td>
-                                                <td data-sort-value="{{ stats.kda }}">{{ "%.1f"|format(stats.kda) }}</td>
-                                                <td data-sort-value="{{ stats.avg_dmg }}">{{ stats.avg_dmg }}</td>
-                                                <td data-sort-value="{{ stats.avg_cs }}">{{ "%.1f"|format(stats.avg_cs) }}</td>
+                                            {% set max_val = priority_data.blue_max_picks %}
+                                            {% for champ_prio in priority_data.blue %}
+                                            <tr data-phases='{{ champ_prio.phases | tojson | safe }}'>
+                                                <td>{{ champ_prio.icon_html | safe }}</td>
+                                                <td style="text-align: left;">{{ champ_prio.champion }}</td>
+                                                <td>{{ champ_prio.total_picks }}</td>
+                                                {% for phase in priority_data.blue_phases %}
+                                                    {% set count = champ_prio.phases.get(phase, 0) %}
+                                                    {% set opacity = (count / max_val) * 0.8 + 0.1 if max_val > 0 and count > 0 else 0 %}
+                                                    <td class="phase-col {{ phase }}" style="background-color: rgba(0, 123, 255, {{ opacity }}); color: {{ '#ffffff' if opacity > 0.55 else '#ccc' }}; text-align: center;">
+                                                        {{ count if count > 0 else '-' }}
+                                                    </td>
+                                                {% endfor %}
                                             </tr>
-                                        {% endfor %}
+                                            {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
+                                {% else %}
+                                <p class="notice" style="text-align: center;">No priority pick data available for Blue Side.</p>
+                                {% endif %}
                             </div>
-                        {% endfor %}
+
+                            <div class="priority-picks-block" style="flex: 1; min-width: 400px; max-width: 600px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 15px;">
+                                <h5 style="color: #e74c3c; text-align: center; margin-top: 0;">Red Side Priority</h5>
+                                {% if priority_data.red %}
+                                <div class="priority-filters" style="margin-bottom: 10px; text-align: center;">
+                                    <span style="color: #ccc; font-size: 0.9em;">Filter by Pick:</span>
+                                    <button class="button priority-filter-btn active" data-target-table="red-priority-table-{{ team_name | replace(' ', '-') }}" data-phase="all" style="padding: 4px 8px; font-size: 0.8em; margin: 2px;">All</button>
+                                    {% for phase in priority_data.red_phases %}
+                                        <button class="button priority-filter-btn" data-target-table="red-priority-table-{{ team_name | replace(' ', '-') }}" data-phase="{{ phase }}" style="padding: 4px 8px; font-size: 0.8em; margin: 2px;">{{ phase }}</button>
+                                    {% endfor %}
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="player-champ-table priority-picks-table" id="red-priority-table-{{ team_name | replace(' ', '-') }}" style="width: 100%;">
+                                        <thead>
+                                            <tr>
+                                                <th>Icon</th>
+                                                <th>Champion</th>
+                                                <th>Total</th>
+                                                {% for phase in priority_data.red_phases %}
+                                                <th class="phase-col {{ phase }}">{{ phase }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% set max_val = priority_data.red_max_picks %}
+                                            {% for champ_prio in priority_data.red %}
+                                            <tr data-phases='{{ champ_prio.phases | tojson | safe }}'>
+                                                <td>{{ champ_prio.icon_html | safe }}</td>
+                                                <td style="text-align: left;">{{ champ_prio.champion }}</td>
+                                                <td>{{ champ_prio.total_picks }}</td>
+                                                {% for phase in priority_data.red_phases %}
+                                                    {% set count = champ_prio.phases.get(phase, 0) %}
+                                                    {% set opacity = (count / max_val) * 0.8 + 0.1 if max_val > 0 and count > 0 else 0 %}
+                                                    <td class="phase-col {{ phase }}" style="background-color: rgba(220, 53, 69, {{ opacity }}); color: {{ '#ffffff' if opacity > 0.55 else '#ccc' }}; text-align: center;">
+                                                        {{ count if count > 0 else '-' }}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <p class="notice" style="text-align: center;">No priority pick data available for Red Side.</p>
+                                {% endif %}
+                            </div>
+
+                        </div>
                     </div>
                 {% endfor %}
             </div>
-            <p id="opp-placeholder-text" class="notice" style="text-align: center; margin-top: 20px;">Please select an opponent team from the dropdown above to view their player stats.</p>
+            <p id="opp-placeholder-text" class="notice" style="text-align: center; margin-top: 20px;">Please select an opponent team from the dropdown above to view their stats and drafts.</p>
         {% else %}
             <p class="notice">No opponent statistics available for this period.</p>
         {% endif %}
@@ -836,6 +938,37 @@
             btn.style.background = btn.style.borderColor;
             btn.style.color = 'white';
         }
+
+// Логика переключения фаз Priority Picks
+        document.querySelectorAll('.priority-filter-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetTableId = this.dataset.targetTable;
+                const phase = this.dataset.phase;
+                const table = document.getElementById(targetTableId);
+
+                // Подсветка активной кнопки
+                this.parentElement.querySelectorAll('.priority-filter-btn').forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                // Показ/скрытие строк
+                table.querySelectorAll('tbody tr').forEach(row => {
+                    if (phase === 'all') {
+                        row.style.display = '';
+                    } else {
+                        const phasesData = JSON.parse(row.dataset.phases || '{}');
+                        if (phasesData[phase] && phasesData[phase] > 0) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    }
+                });
+            });
+        });
+
+
+
+
 
         document.addEventListener('DOMContentLoaded', () => {
             const sortableTables = document.querySelectorAll('.sortable-table');
