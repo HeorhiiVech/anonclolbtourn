@@ -758,7 +758,7 @@ def aggregate_scrim_data(time_filter="All Time", side_filter="all"):
                     total_seconds = minutes * 60 + seconds
                 else:
                     total_seconds = int(parts[0])
-                if total_seconds < 1200:
+                if total_seconds < 900:
                     continue
             except (ValueError, TypeError):
                 continue
